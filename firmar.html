@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer"><title>Contrato para firmar · CLARENY</title><style>body{margin:0;background:#07090b;color:#e8eef2;font:17px/1.5 -apple-system,'Segoe UI',Roboto,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;text-align:center}</style></head><body><div id="m">Abriendo el contrato…</div><script id="origen" type="application/json">{"raw":"https://raw.githubusercontent.com/clareny/Firmas/main/c/","api":"https://api.github.com/repos/clareny/Firmas/contents/c/","rama":"main"}</script><script>(function abrirLinkFirma() {
+  var m = document.getElementById("m");
+  function error(t) { m.innerHTML = t; }
+  function bytes(b64) {
+    var s = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
+    var u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  }
+  var origen = JSON.parse(document.getElementById("origen").textContent);
+  var id = (location.search.match(/[?&]c=([A-Za-z0-9]+)/) || [])[1];
+  var clave = location.hash.slice(1);
+  if (!id || !clave) return error("Al link le falta una parte.<br>Pedí que te lo manden de nuevo y abrilo completo.");
+  if (!window.crypto || !crypto.subtle || !window.fetch) return error("Este navegador no puede abrir el contrato.<br>Abrí el link con Safari o Chrome.");
+  var k;
+  try { k = bytes(clave); } catch (e) { return error("El link está incompleto.<br>Pedí que te lo manden de nuevo."); }
+  function leer(url, opciones) {
+    return fetch(url, opciones).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    });
+  }
+  /* Si raw.githubusercontent.com falla se prueba con la API de GitHub; si fallan las dos, se reintenta unos segundos. */
+  function traer(intento) {
+    return leer(origen.raw + id + ".txt?v=" + Date.now(), { cache: "no-store" }).catch(function () {
+      return leer(origen.api + id + ".txt?ref=" + encodeURIComponent(origen.rama), { cache: "no-store", headers: { Accept: "application/vnd.github.raw" } });
+    }).catch(function (e) {
+      if (intento >= 3) throw e;
+      return new Promise(function (ok) { setTimeout(ok, 2500); }).then(function () { return traer(intento + 1); });
+    });
+  }
+  var descifrado = traer(1).then(function (txt) {
+    var c = txt.trim().split(".");
+    return crypto.subtle.importKey("raw", k, "AES-GCM", false, ["decrypt"]).then(function (key) {
+      return crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes(c[0]) }, key, bytes(c[1]));
+    });
+  });
+  /* document.open() solo reemplaza la página si esta ya terminó de cargar; si no, mezcla las dos. */
+  var cargada = new Promise(function (ok) {
+    if (document.readyState === "complete") ok(); else window.addEventListener("load", function () { setTimeout(ok, 0); });
+  });
+  Promise.all([descifrado, cargada]).then(function (r) {
+    var html = new TextDecoder().decode(r[0]);
+    document.open();
+    document.write(html);
+    document.close();
+  }, function () {
+    error("No se pudo abrir el contrato.<br>Revisá que tengas internet y tocá el link de nuevo. Si sigue sin abrir, pedí un link nuevo.");
+  });
+})();</script></body></html>
